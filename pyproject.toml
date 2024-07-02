@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "krb-spray"
+version = "0.0.1"
+description = ""
+authors = ["dadevel <dadevel@disroot.org>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "krbspray"}]
+
+[tool.poetry.scripts]
+krb-spray = "krbspray.main:main"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+impacket = "^0.11.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
