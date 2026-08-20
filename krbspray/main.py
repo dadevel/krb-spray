@@ -29,7 +29,7 @@ def main() -> None:
     entrypoint.add_argument('--jitter', type=uint, default=0, metavar='SECONDS')
     group = entrypoint.add_argument_group('auth')
     group.add_argument('-d', '--domain', required=True, metavar='FQDN')
-    group.add_argument('-K', '--kdc', metavar='FQDN')
+    group.add_argument('-K', '--kdc', metavar='IP|FQDN')
     group.add_argument('-u', '--user', action='append', default=[], metavar='STRING')
     group.add_argument('-U', '--users', action='append', type=Path, default=[], metavar='FILE')
     group.add_argument('-p', '--password', action='append', default=[], metavar='STRING')
